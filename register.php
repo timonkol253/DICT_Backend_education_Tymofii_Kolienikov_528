@@ -1,49 +1,38 @@
 <?php
-// TODO 1: PREPARING ENVIRONMENT: 1) session 2) functions
 session_start();
 
-// TODO 2: ROUTING
 if (!empty($_SESSION['auth'])) {
     header('Location: /admin.php');
     die;
 }
 
-// TODO 3: CODE by REQUEST METHODS (ACTIONS) GET, POST, etc. (handle data from request): 1) validate 2) working with data source 3) transforming data
+$aConfig = require_once 'config.php';
+$db = mysqli_connect(
+        $aConfig['host'],
+        $aConfig['user'],
+        $aConfig['pass'],
+        $aConfig['name']
+);
 
-// 1. Create empty $infoMessage
 $infoMessage = '';
 
-// 2. handle form data
 if (!empty($_POST['email']) && !empty($_POST['password'])) {
 
-    // 3. Check that user has already existed
-    $isAlreadyRegistered = false;
-    $fileUsers = 'users.csv';
+    $email    = mysqli_real_escape_string($db, trim($_POST['email']));
+    $password = mysqli_real_escape_string($db, trim($_POST['password']));
 
-    if (file_exists($fileUsers)) {
-        $sUsers = file_get_contents($fileUsers);
-        $aJsonsUsers = explode("\n", $sUsers);
+    // Перевірка чи вже існує користувач
+    $result = mysqli_query($db, "SELECT id FROM users WHERE email = '$email'");
 
-        foreach ($aJsonsUsers as $jsonUser) {
-            $aUser = json_decode($jsonUser, true);
-            if (!$aUser) break;
+    if (mysqli_num_rows($result) > 0) {
+        $infoMessage  = "Такой пользователь уже существует! Перейдите на страницу входа. ";
+        $infoMessage .= "<a href='/login.php'>Страница входа</a>";
+    } else {
+        // Створення нового користувача
+        $hashedPassword = md5($password);
+        mysqli_query($db, "INSERT INTO users (email, password) VALUES ('$email', '$hashedPassword')");
 
-            foreach ($aUser as $email => $password) {
-                if (($email == $_POST['email']) && ($password == $_POST['password'])) {
-                    $isAlreadyRegistered = true;
-
-                    $infoMessage = "Такой пользователь уже существует! Перейдите на страницу входа. ";
-                    $infoMessage .= "<a href='/login.php'>Страница входа</a>";
-                }
-            }
-        }
-    }
-
-    if (!$isAlreadyRegistered) {
-        // 4. Create new user
-        $aNewUser = [$_POST['email'] => $_POST['password']];
-        file_put_contents("users.csv", json_encode($aNewUser) . "\n", FILE_APPEND);
-
+        mysqli_close($db);
         header('Location: /login.php');
         die;
     }
@@ -52,18 +41,12 @@ if (!empty($_POST['email']) && !empty($_POST['password'])) {
     $infoMessage = 'Заполните форму регистрации!';
 }
 
-// TODO 4: RENDER: 1) view (html) 2) data (from php)
-
+mysqli_close($db);
 ?>
-
-
 <!DOCTYPE html>
 <html>
-
 <?php require_once 'sectionHead.php' ?>
-
 <body>
-
 <div class="container">
 
     <?php require_once 'sectionNavbar.php' ?>
@@ -90,18 +73,13 @@ if (!empty($_POST['email']) && !empty($_POST['password'])) {
                 </div>
             </form>
 
-            <!-- TODO: render php data   -->
-            <?php
-                if ($infoMessage) {
-                    echo '<hr/>';
-                    echo "<span style='color:red'>$infoMessage</span>";
-                }
-            ?>
+            <?php if ($infoMessage): ?>
+                <hr/>
+                <span style="color:red"><?= $infoMessage ?></span>
+            <?php endif; ?>
 
         </div>
-
     </div>
 </div>
-
 </body>
 </html>

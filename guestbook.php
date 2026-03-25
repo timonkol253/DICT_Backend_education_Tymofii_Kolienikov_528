@@ -2,38 +2,25 @@
 // TODO 1: PREPARING ENVIRONMENT
 session_start();
 
+$aConfig = require_once 'config.php';
+$db = mysqli_connect(
+        $aConfig['host'],
+        $aConfig['user'],
+        $aConfig['pass'],
+        $aConfig['name']
+);
+
 $comments = [];
 $errors = [];
 $success = false;
-$commentsFile = 'comments.csv';
-
-// Функція читання коментарів з файлу
-function getComments($filename) {
-    $comments = [];
-    if (file_exists($filename)) {
-        $fileStream = fopen($filename, "r");
-        while (!feof($fileStream)) {
-            $jsonString = fgets($fileStream);
-            $array = json_decode($jsonString, true);
-            if (empty($array)) break;
-            $comments[] = $array;
-        }
-        fclose($fileStream);
-    }
-    return $comments;
-}
-
-// TODO 2: ROUTING — нічого не потрібно, одна сторінка
 
 // TODO 3: CODE by REQUEST METHODS
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Перевірка наявності даних
     $email = isset($_POST['email']) ? trim($_POST['email']) : '';
     $name  = isset($_POST['name'])  ? trim($_POST['name'])  : '';
     $text  = isset($_POST['text'])  ? trim($_POST['text'])  : '';
 
-    // Валідація
     if (empty($email)) $errors[] = 'Email є обов\'язковим полем';
     if (empty($name))  $errors[] = 'Ім\'я є обов\'язковим полем';
     if (empty($text))  $errors[] = 'Текст коментаря є обов\'язковим полем';
@@ -41,29 +28,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Невірний формат email';
     }
 
-    // Якщо помилок немає — зберігаємо
     if (empty($errors)) {
-        $comment = [
-                'email' => $email,
-                'name'  => $name,
-                'text'  => $text,
-                'date'  => date('d.m.Y H:i')
-        ];
+        $name  = mysqli_real_escape_string($db, $name);
+        $email = mysqli_real_escape_string($db, $email);
+        $text  = mysqli_real_escape_string($db, $text);
 
-        // Запис у файл
-        $jsonString = json_encode($comment, JSON_UNESCAPED_UNICODE);
-        $fileStream = fopen($commentsFile, 'a');
-        fwrite($fileStream, $jsonString . "\n");
-        fclose($fileStream);
+        $query = "INSERT INTO comments (name, email, text, date)
+                  VALUES ('$name', '$email', '$text', NOW())";
+        mysqli_query($db, $query);
 
         $success = true;
     }
 }
 
-// Отримуємо коментарі для відображення
-$comments = getComments($commentsFile);
-// Показуємо спочатку нові
-$comments = array_reverse($comments);
+// Отримуємо коментарі з БД
+$query      = 'SELECT * FROM comments ORDER BY date DESC';
+$dbResponse = mysqli_query($db, $query);
+$comments   = mysqli_fetch_all($dbResponse, MYSQLI_ASSOC);
+
+mysqli_close($db);
 ?>
 <!DOCTYPE html>
 <html>
@@ -71,12 +54,10 @@ $comments = array_reverse($comments);
 <body>
 <div class="container">
 
-    <!-- navbar menu -->
     <?php require_once 'sectionNavbar.php' ?>
 
     <br>
 
-    <!-- guestbook form section -->
     <div class="card card-primary">
         <div class="card-header bg-primary text-light">
             GuestBook form
@@ -85,14 +66,12 @@ $comments = array_reverse($comments);
             <div class="row">
                 <div class="col-sm-6">
 
-                    <!-- Повідомлення про успіх -->
                     <?php if ($success): ?>
                         <div class="alert alert-success">
                             Коментар успішно додано!
                         </div>
                     <?php endif; ?>
 
-                    <!-- Помилки валідації -->
                     <?php if (!empty($errors)): ?>
                         <div class="alert alert-danger">
                             <?php foreach ($errors as $error): ?>
@@ -101,7 +80,6 @@ $comments = array_reverse($comments);
                         </div>
                     <?php endif; ?>
 
-                    <!-- TODO: create guestBook html form -->
                     <form method="POST" action="/guestbook.php">
 
                         <div class="mb-3">
@@ -152,7 +130,6 @@ $comments = array_reverse($comments);
 
     <br>
 
-    <!-- comments section -->
     <div class="card card-primary">
         <div class="card-header bg-body-secondary text-dark">
             Comments
@@ -161,7 +138,6 @@ $comments = array_reverse($comments);
             <div class="row">
                 <div class="col-sm-6">
 
-                    <!-- TODO: render guestBook comments -->
                     <?php if (empty($comments)): ?>
                         <p class="text-muted">Коментарів поки немає. Будьте першим!</p>
                     <?php else: ?>
