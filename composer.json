@@ -1,0 +1,7 @@
+{
+    "name": "tymofii/guestbook",
+    "description": "Guestbook site",
+    "require": {
+        "symfony/var-dumper": "^7.4"
+    }
+}
